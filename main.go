@@ -55,17 +55,28 @@ go run main.go --input=/home/tamal/go/src/go.searchlight.dev/grafana-operator/cr
 go run main.go --input=/home/tamal/go/src/sigs.k8s.io/application/config/crd/bases
 */
 
-var crdstore = map[schema.GroupKind]map[string]*unstructured.Unstructured{}
+var (
+	crdstore = map[schema.GroupKind]map[string]*unstructured.Unstructured{}
+	empty    = struct{}{}
+)
 
 func main() {
 	var input []string
 	var out string
-	var crdVersion string = "v1"
+	var crdVersion = "v1"
+	var gks []string
+
 	flag.StringSliceVar(&input, "input", input, "List of crd urls or dir/files")
 	flag.StringVar(&out, "out", out, "Directory where files to be stored")
 	flag.StringVar(&crdVersion, "v", crdVersion, "CRD version v1/v1beta1")
+	flag.StringSliceVar(&gks, "gk", gks, "List of kind.group to import")
 	flag.CommandLine.AddGoFlagSet(goflag.CommandLine)
 	flag.Parse()
+
+	allowedGKs := map[schema.GroupKind]struct{}{}
+	for _, gk := range gks {
+		allowedGKs[schema.ParseGroupKind(gk)] = empty
+	}
 
 	err := os.MkdirAll(out, 0755)
 	if err != nil {
@@ -80,9 +91,11 @@ func main() {
 	}
 
 	for gk := range crdstore {
-		err := WriteCRD(out, gk, crdVersion)
-		if err != nil {
-			panic(err)
+		if _, ok := allowedGKs[gk]; ok || len(allowedGKs) == 0 {
+			err := WriteCRD(out, gk, crdVersion)
+			if err != nil {
+				panic(err)
+			}
 		}
 	}
 }
