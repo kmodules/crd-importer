@@ -36,6 +36,7 @@ import (
 	crdv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/yaml"
 )
 
@@ -58,6 +59,9 @@ go run main.go --input=/home/tamal/go/src/sigs.k8s.io/application/config/crd/bas
 var (
 	crdstore = map[schema.GroupKind]map[string]*unstructured.Unstructured{}
 	empty    = struct{}{}
+
+	allowedGroups = sets.NewString()
+	allowedGKs    = map[schema.GroupKind]struct{}{}
 )
 
 func main() {
@@ -65,15 +69,18 @@ func main() {
 	var out string
 	var crdVersion = "v1"
 	var gks []string
+	var groups []string
 
 	flag.StringSliceVar(&input, "input", input, "List of crd urls or dir/files")
 	flag.StringVar(&out, "out", out, "Directory where files to be stored")
 	flag.StringVar(&crdVersion, "v", crdVersion, "CRD version v1/v1beta1")
+	flag.StringSliceVarP(&groups, "group", "g", groups, "List of groups to import")
 	flag.StringSliceVar(&gks, "gk", gks, "List of kind.group to import")
 	flag.CommandLine.AddGoFlagSet(goflag.CommandLine)
 	flag.Parse()
 
-	allowedGKs := map[schema.GroupKind]struct{}{}
+	allowedGroups.Insert(groups...)
+
 	for _, gk := range gks {
 		allowedGKs[schema.ParseGroupKind(gk)] = empty
 	}
@@ -91,13 +98,27 @@ func main() {
 	}
 
 	for gk := range crdstore {
-		if _, ok := allowedGKs[gk]; ok || len(allowedGKs) == 0 {
+		if allowed(gk) {
 			err := WriteCRD(out, gk, crdVersion)
 			if err != nil {
 				panic(err)
 			}
 		}
 	}
+}
+
+func allowed(gk schema.GroupKind) bool {
+	if len(allowedGroups) == 0 && len(allowedGKs) == 0 {
+		return true
+	}
+
+	if _, ok := allowedGroups[gk.Group]; ok {
+		return true
+	}
+	if _, ok := allowedGKs[gk]; ok {
+		return true
+	}
+	return false
 }
 
 func processLocation(location string) error {
