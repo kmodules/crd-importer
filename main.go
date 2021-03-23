@@ -67,12 +67,14 @@ var (
 func main() {
 	var input []string
 	var out string
+	var outputYAML string
 	var crdVersion = "v1"
 	var gks []string
 	var groups []string
 
 	flag.StringSliceVar(&input, "input", input, "List of crd urls or dir/files")
 	flag.StringVar(&out, "out", out, "Directory where files to be stored")
+	flag.StringVar(&outputYAML, "output-yaml", outputYAML, "Output a single YAML filename")
 	flag.StringVar(&crdVersion, "v", crdVersion, "CRD version v1/v1beta1")
 	flag.StringSliceVarP(&groups, "group", "g", groups, "List of groups to import")
 	flag.StringSliceVar(&gks, "gk", gks, "List of kind.group to import")
@@ -97,12 +99,31 @@ func main() {
 		}
 	}
 
+	var buf bytes.Buffer
 	for gk := range crdstore {
 		if allowed(gk) {
-			err := WriteCRD(out, gk, crdVersion)
+			data, filename, err := WriteCRD(out, gk, crdVersion)
 			if err != nil {
 				panic(err)
 			}
+			if outputYAML != "" {
+				if buf.Len() > 0 {
+					buf.WriteString("\n---\n")
+				}
+				buf.Write(data)
+			} else {
+				err = ioutil.WriteFile(filename, data, 0644)
+				if err != nil {
+					panic(err)
+				}
+			}
+		}
+	}
+
+	if outputYAML != "" {
+		err = ioutil.WriteFile(filepath.Join(out, outputYAML), buf.Bytes(), 0644)
+		if err != nil {
+			panic(err)
 		}
 	}
 }
@@ -182,13 +203,13 @@ func extractCRD(obj *unstructured.Unstructured) error {
 	return nil
 }
 
-func WriteCRD(dir string, gk schema.GroupKind, version string) error {
+func WriteCRD(dir string, gk schema.GroupKind, version string) ([]byte, string, error) {
 	crdversions, ok := crdstore[gk]
 	if !ok {
-		return fmt.Errorf("missing crd for %+v", gk)
+		return nil, "", fmt.Errorf("missing crd for %+v", gk)
 	}
 	if len(crdversions) == 0 {
-		return fmt.Errorf("missing crd version for %+v", gk)
+		return nil, "", fmt.Errorf("missing crd version for %+v", gk)
 	}
 
 	crd, ok := crdversions[version]
@@ -197,77 +218,78 @@ func WriteCRD(dir string, gk schema.GroupKind, version string) error {
 			// convert to v1
 			data, err := yaml.Marshal(crdversions["v1beta1"])
 			if err != nil {
-				return err
+				return nil, "", err
 			}
 			var defv1beta1 crdv1beta1.CustomResourceDefinition
 			err = yaml.Unmarshal(data, &defv1beta1)
 			if err != nil {
-				return err
+				return nil, "", err
 			}
 
 			var inner apiextensions.CustomResourceDefinition
 			err = crdv1beta1.Convert_v1beta1_CustomResourceDefinition_To_apiextensions_CustomResourceDefinition(&defv1beta1, &inner, nil)
 			if err != nil {
-				return err
+				return nil, "", err
 			}
 
 			var defv1 crdv1.CustomResourceDefinition
 			err = crdv1.Convert_apiextensions_CustomResourceDefinition_To_v1_CustomResourceDefinition(&inner, &defv1, nil)
 			if err != nil {
-				return err
+				return nil, "", err
 			}
 
 			data, err = yaml.Marshal(defv1)
 			if err != nil {
-				return err
+				return nil, "", err
 			}
 
 			filename := filepath.Join(dir, fmt.Sprintf("%s_%s.yaml", defv1.Spec.Group, defv1.Spec.Names.Plural))
-			return ioutil.WriteFile(filename, data, 0644)
+			return data, filename, nil
+			// return ioutil.WriteFile(filename, data, 0644)
 		} else if version == "v1beta1" {
 			// convert to v1beta1
 			data, err := yaml.Marshal(crdversions["v1"])
 			if err != nil {
-				return err
+				return nil, "", err
 			}
 			var defv1 crdv1.CustomResourceDefinition
 			err = yaml.Unmarshal(data, &defv1)
 			if err != nil {
-				return err
+				return nil, "", err
 			}
 
 			var inner apiextensions.CustomResourceDefinition
 			err = crdv1.Convert_v1_CustomResourceDefinition_To_apiextensions_CustomResourceDefinition(&defv1, &inner, nil)
 			if err != nil {
-				return err
+				return nil, "", err
 			}
 
 			var defv1beta1 crdv1beta1.CustomResourceDefinition
 			err = crdv1beta1.Convert_apiextensions_CustomResourceDefinition_To_v1beta1_CustomResourceDefinition(&inner, &defv1beta1, nil)
 			if err != nil {
-				return err
+				return nil, "", err
 			}
 
 			data, err = yaml.Marshal(defv1beta1)
 			if err != nil {
-				return err
+				return nil, "", err
 			}
 
 			filename := filepath.Join(dir, fmt.Sprintf("%s_%s.yaml", defv1beta1.Spec.Group, defv1beta1.Spec.Names.Plural))
-			return ioutil.WriteFile(filename, data, 0644)
+			return data, filename, nil
 		}
 	}
 
 	data, err := yaml.Marshal(crd)
 	if err != nil {
-		return err
+		return nil, "", err
 	}
 
 	var def Definition
 	err = meta_util.DecodeObject(crd.Object, &def)
 	if err != nil {
-		return err
+		return nil, "", err
 	}
 	filename := filepath.Join(dir, fmt.Sprintf("%s_%s.yaml", def.Spec.Group, def.Spec.Names.Plural))
-	return ioutil.WriteFile(filename, data, 0644)
+	return data, filename, nil
 }
