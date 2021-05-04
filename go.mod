@@ -3,11 +3,14 @@ module kmodules.xyz/crd-importer
 go 1.14
 
 require (
+	github.com/onsi/gomega v1.8.1 // indirect
 	github.com/spf13/pflag v1.0.5
+	gomodules.xyz/pointer v0.0.0-20201105071923-daf60fa55209 // indirect
+	google.golang.org/appengine v1.6.5 // indirect
 	k8s.io/apiextensions-apiserver v0.21.0
 	k8s.io/apimachinery v0.21.0
 	k8s.io/utils v0.0.0-20210111153108-fddb29f9d009 // indirect
-	kmodules.xyz/client-go v0.0.0-20210503064222-c8c59295a3a5
+	kmodules.xyz/client-go v0.0.0-20210504024435-1eb80721e9b8
 	sigs.k8s.io/yaml v1.2.0
 )
 
