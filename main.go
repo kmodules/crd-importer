@@ -26,6 +26,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sort"
 
 	meta_util "kmodules.xyz/client-go/meta"
 	"kmodules.xyz/client-go/tools/parser"
@@ -99,7 +100,7 @@ func main() {
 		}
 	}
 
-	var buf bytes.Buffer
+	outputCRDs := make([]CRD, 0, len(crdstore))
 	for gk := range crdstore {
 		if allowed(gk) {
 			data, filename, err := WriteCRD(out, gk, crdVersion)
@@ -107,10 +108,10 @@ func main() {
 				panic(err)
 			}
 			if outputYAML != "" {
-				if buf.Len() > 0 {
-					buf.WriteString("\n---\n")
-				}
-				buf.Write(data)
+				outputCRDs = append(outputCRDs, CRD{
+					GK:  gk,
+					Def: data,
+				})
 			} else {
 				err = ioutil.WriteFile(filename, data, 0644)
 				if err != nil {
@@ -121,6 +122,20 @@ func main() {
 	}
 
 	if outputYAML != "" {
+		sort.Slice(outputCRDs, func(i, j int) bool {
+			if outputCRDs[i].GK.Group == outputCRDs[j].GK.Group {
+				return outputCRDs[i].GK.Kind < outputCRDs[j].GK.Kind
+			}
+			return outputCRDs[i].GK.Group < outputCRDs[j].GK.Group
+		})
+
+		var buf bytes.Buffer
+		for i, crd := range outputCRDs {
+			if i > 0 {
+				buf.WriteString("\n---\n")
+			}
+			buf.Write(crd.Def)
+		}
 		err = ioutil.WriteFile(filepath.Join(out, outputYAML), buf.Bytes(), 0644)
 		if err != nil {
 			panic(err)

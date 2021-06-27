@@ -18,6 +18,7 @@ package main
 
 import (
 	crdv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 type Definition struct {
@@ -29,4 +30,9 @@ type Definition struct {
 type DefinitionSpec struct {
 	Group string                              `json:"group"`
 	Names crdv1.CustomResourceDefinitionNames `json:"names"`
+}
+
+type CRD struct {
+	GK  schema.GroupKind
+	Def []byte
 }
