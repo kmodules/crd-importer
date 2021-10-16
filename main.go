@@ -182,7 +182,7 @@ func processLocation(location string) error {
 		return err
 	}
 	if fi.IsDir() {
-		return parser.ProcessDir(location, extractCRD)
+		return parser.ProcessPath(location, extractCRD)
 	} else {
 		data, err := ioutil.ReadFile(location)
 		if err != nil {
@@ -192,10 +192,10 @@ func processLocation(location string) error {
 	}
 }
 
-func extractCRD(obj *unstructured.Unstructured) error {
+func extractCRD(ri parser.ResourceInfo) error {
 	var def Definition
 
-	err := meta_util.DecodeObject(obj.Object, &def)
+	err := meta_util.DecodeObject(ri.Object.Object, &def)
 	if err != nil {
 		return err
 	}
@@ -213,7 +213,7 @@ func extractCRD(obj *unstructured.Unstructured) error {
 	if _, ok := crdstore[gk]; !ok {
 		crdstore[gk] = map[string]*unstructured.Unstructured{}
 	}
-	crdstore[gk][gv.Version] = obj
+	crdstore[gk][gv.Version] = ri.Object
 
 	return nil
 }
