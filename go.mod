@@ -3,12 +3,18 @@ module kmodules.xyz/crd-importer
 go 1.14
 
 require (
-	github.com/google/go-cmp v0.5.6 // indirect
-	github.com/json-iterator/go v1.1.11 // indirect
+	github.com/fsnotify/fsnotify v1.5.1 // indirect
+	github.com/k0kubun/colorstring v0.0.0-20150214042306-9440f1994b88 // indirect
+	github.com/mattn/go-colorable v0.1.9 // indirect
+	github.com/mattn/go-isatty v0.0.14 // indirect
+	github.com/mitchellh/mapstructure v1.4.1 // indirect
+	github.com/sergi/go-diff v1.2.0 // indirect
 	github.com/spf13/pflag v1.0.5
 	k8s.io/apiextensions-apiserver v0.21.1
 	k8s.io/apimachinery v0.21.1
-	kmodules.xyz/client-go v0.0.0-20211013093146-1fbfd52e78c9
+	k8s.io/klog/v2 v2.9.0 // indirect
+	k8s.io/kube-openapi v0.0.0-20210421082810-95288971da7e // indirect
+	kmodules.xyz/client-go v0.0.0-20220215012708-9963581d69a7
 	sigs.k8s.io/yaml v1.2.0
 )
 
@@ -100,7 +106,7 @@ replace k8s.io/api => k8s.io/api v0.21.1
 
 replace k8s.io/apimachinery => github.com/kmodules/apimachinery v0.21.2-rc.0.0.20210617231004-332981b97d2d
 
-replace k8s.io/apiserver => github.com/kmodules/apiserver v0.21.2-0.20210716212718-83e5493ac170
+replace k8s.io/apiserver => github.com/kmodules/apiserver v0.21.2-0.20220112070009-e3f6e88991d9
 
 replace k8s.io/cli-runtime => k8s.io/cli-runtime v0.21.1
 
