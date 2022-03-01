@@ -69,7 +69,7 @@ func main() {
 	var input []string
 	var out string
 	var outputYAML string
-	var crdVersion = "v1"
+	crdVersion := "v1"
 	var gks []string
 	var groups []string
 
@@ -88,7 +88,7 @@ func main() {
 		allowedGKs[schema.ParseGroupKind(gk)] = empty
 	}
 
-	err := os.MkdirAll(out, 0755)
+	err := os.MkdirAll(out, 0o755)
 	if err != nil {
 		panic(err)
 	}
@@ -113,7 +113,7 @@ func main() {
 					Def: data,
 				})
 			} else {
-				err = ioutil.WriteFile(filename, data, 0644)
+				err = ioutil.WriteFile(filename, data, 0o644)
 				if err != nil {
 					panic(err)
 				}
@@ -136,7 +136,7 @@ func main() {
 			}
 			buf.Write(crd.Def)
 		}
-		err = ioutil.WriteFile(filepath.Join(out, outputYAML), buf.Bytes(), 0644)
+		err = ioutil.WriteFile(filepath.Join(out, outputYAML), buf.Bytes(), 0o644)
 		if err != nil {
 			panic(err)
 		}
