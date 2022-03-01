@@ -46,5 +46,6 @@ jobs:
             bin/crd-importer-linux-arm
             bin/crd-importer-linux-arm64
             bin/crd-importer-darwin-amd64
+            bin/crd-importer-darwin-arm64
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
