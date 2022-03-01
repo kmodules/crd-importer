@@ -193,6 +193,10 @@ func processLocation(location string) error {
 }
 
 func extractCRD(ri parser.ResourceInfo) error {
+	if ri.Object.GetKind() == "" {
+		return nil
+	}
+
 	var def Definition
 
 	err := meta_util.DecodeObject(ri.Object.Object, &def)
