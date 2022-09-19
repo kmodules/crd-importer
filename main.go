@@ -21,7 +21,6 @@ import (
 	goflag "flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
@@ -113,7 +112,7 @@ func main() {
 					Def: data,
 				})
 			} else {
-				err = ioutil.WriteFile(filename, data, 0o644)
+				err = os.WriteFile(filename, data, 0o644)
 				if err != nil {
 					panic(err)
 				}
@@ -136,7 +135,7 @@ func main() {
 			}
 			buf.Write(crd.Def)
 		}
-		err = ioutil.WriteFile(filepath.Join(out, outputYAML), buf.Bytes(), 0o644)
+		err = os.WriteFile(filepath.Join(out, outputYAML), buf.Bytes(), 0o644)
 		if err != nil {
 			panic(err)
 		}
@@ -184,7 +183,7 @@ func processLocation(location string) error {
 	if fi.IsDir() {
 		return parser.ProcessPath(location, extractCRD)
 	} else {
-		data, err := ioutil.ReadFile(location)
+		data, err := os.ReadFile(location)
 		if err != nil {
 			return err
 		}
@@ -264,7 +263,7 @@ func WriteCRD(dir string, gk schema.GroupKind, version string) ([]byte, string, 
 
 			filename := filepath.Join(dir, fmt.Sprintf("%s_%s.yaml", defv1.Spec.Group, defv1.Spec.Names.Plural))
 			return data, filename, nil
-			// return ioutil.WriteFile(filename, data, 0644)
+			// return os.WriteFile(filename, data, 0644)
 		} else if version == "v1beta1" {
 			// convert to v1beta1
 			data, err := yaml.Marshal(crdversions["v1"])
