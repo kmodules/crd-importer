@@ -18,6 +18,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	goflag "flag"
 	"fmt"
 	"io"
@@ -71,6 +72,7 @@ func main() {
 	crdVersion := "v1"
 	var gks []string
 	var groups []string
+	var noDesc bool
 
 	flag.StringSliceVar(&input, "input", input, "List of crd urls or dir/files")
 	flag.StringVar(&out, "out", out, "Directory where files to be stored")
@@ -78,6 +80,7 @@ func main() {
 	flag.StringVar(&crdVersion, "v", crdVersion, "CRD version v1/v1beta1")
 	flag.StringSliceVarP(&groups, "group", "g", groups, "List of groups to import")
 	flag.StringSliceVar(&gks, "gk", gks, "List of kind.group to import")
+	flag.BoolVar(&noDesc, "no-description", noDesc, "If true, remove description")
 	flag.CommandLine.AddGoFlagSet(goflag.CommandLine)
 	flag.Parse()
 
@@ -102,7 +105,7 @@ func main() {
 	outputCRDs := make([]CRD, 0, len(crdstore))
 	for gk := range crdstore {
 		if allowed(gk) {
-			data, filename, err := WriteCRD(out, gk, crdVersion)
+			data, filename, err := WriteCRD(out, gk, crdVersion, noDesc)
 			if err != nil {
 				panic(err)
 			}
@@ -221,7 +224,7 @@ func extractCRD(ri parser.ResourceInfo) error {
 	return nil
 }
 
-func WriteCRD(dir string, gk schema.GroupKind, version string) ([]byte, string, error) {
+func WriteCRD(dir string, gk schema.GroupKind, version string, noDesc bool) ([]byte, string, error) {
 	crdversions, ok := crdstore[gk]
 	if !ok {
 		return nil, "", fmt.Errorf("missing crd for %+v", gk)
@@ -256,7 +259,11 @@ func WriteCRD(dir string, gk schema.GroupKind, version string) ([]byte, string, 
 				return nil, "", err
 			}
 
-			data, err = yaml.Marshal(defv1)
+			if noDesc {
+				removeCRDDesc(defv1)
+			}
+
+			data, err = removeStatus(defv1)
 			if err != nil {
 				return nil, "", err
 			}
@@ -276,6 +283,10 @@ func WriteCRD(dir string, gk schema.GroupKind, version string) ([]byte, string, 
 				return nil, "", err
 			}
 
+			if noDesc {
+				removeCRDDesc(defv1)
+			}
+
 			var inner apiextensions.CustomResourceDefinition
 			err = crdv1.Convert_v1_CustomResourceDefinition_To_apiextensions_CustomResourceDefinition(&defv1, &inner, nil)
 			if err != nil {
@@ -288,7 +299,7 @@ func WriteCRD(dir string, gk schema.GroupKind, version string) ([]byte, string, 
 				return nil, "", err
 			}
 
-			data, err = yaml.Marshal(defv1beta1)
+			data, err = removeStatus(defv1beta1)
 			if err != nil {
 				return nil, "", err
 			}
@@ -302,12 +313,99 @@ func WriteCRD(dir string, gk schema.GroupKind, version string) ([]byte, string, 
 	if err != nil {
 		return nil, "", err
 	}
-
-	var def Definition
-	err = meta_util.DecodeObject(crd.Object, &def)
+	var defv1 crdv1.CustomResourceDefinition
+	err = yaml.Unmarshal(data, &defv1)
 	if err != nil {
 		return nil, "", err
 	}
-	filename := filepath.Join(dir, fmt.Sprintf("%s_%s.yaml", def.Spec.Group, def.Spec.Names.Plural))
+
+	if noDesc {
+		removeCRDDesc(defv1)
+	}
+
+	data, err = removeStatus(defv1)
+	if err != nil {
+		return nil, "", err
+	}
+
+	filename := filepath.Join(dir, fmt.Sprintf("%s_%s.yaml", defv1.Spec.Group, defv1.Spec.Names.Plural))
 	return data, filename, nil
+}
+
+func removeCRDDesc(defv1 crdv1.CustomResourceDefinition) {
+	for idx, v := range defv1.Spec.Versions {
+		if v.Schema != nil && v.Schema.OpenAPIV3Schema != nil {
+			removeDescription(v.Schema.OpenAPIV3Schema)
+			defv1.Spec.Versions[idx] = v
+		}
+	}
+}
+
+// removeDescription removes description from apiextensions.k8s.io/v1 CRD definition.
+func removeDescription(schema *crdv1.JSONSchemaProps) {
+	if schema == nil {
+		return
+	}
+
+	schema.Description = ""
+
+	if schema.Items != nil {
+		removeDescription(schema.Items.Schema)
+
+		for idx := range schema.Items.JSONSchemas {
+			removeDescription(&schema.Items.JSONSchemas[idx])
+		}
+	}
+
+	for idx := range schema.AllOf {
+		removeDescription(&schema.AllOf[idx])
+	}
+	for idx := range schema.OneOf {
+		removeDescription(&schema.OneOf[idx])
+	}
+	for idx := range schema.AnyOf {
+		removeDescription(&schema.AnyOf[idx])
+	}
+	if schema.Not != nil {
+		removeDescription(schema.Not)
+	}
+	for key, prop := range schema.Properties {
+		removeDescription(&prop)
+		schema.Properties[key] = prop
+	}
+	if schema.AdditionalProperties != nil {
+		removeDescription(schema.AdditionalProperties.Schema)
+	}
+	for key, prop := range schema.PatternProperties {
+		removeDescription(&prop)
+		schema.PatternProperties[key] = prop
+	}
+	for key, prop := range schema.Dependencies {
+		removeDescription(prop.Schema)
+		schema.Dependencies[key] = prop
+	}
+	if schema.AdditionalItems != nil {
+		removeDescription(schema.AdditionalItems.Schema)
+	}
+	for key, prop := range schema.Definitions {
+		removeDescription(&prop)
+		schema.Definitions[key] = prop
+	}
+}
+
+func removeStatus(crd any) ([]byte, error) {
+	jsonBytes, err := json.Marshal(crd)
+	if err != nil {
+		return nil, err
+	}
+
+	var content map[string]any
+	err = json.Unmarshal(jsonBytes, &content)
+	if err != nil {
+		return nil, err
+	}
+
+	unstructured.RemoveNestedField(content, "status")
+
+	return yaml.Marshal(content)
 }
