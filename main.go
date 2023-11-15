@@ -263,7 +263,7 @@ func WriteCRD(dir string, gk schema.GroupKind, version string, noDesc bool) ([]b
 				removeCRDDesc(defv1)
 			}
 
-			data, err = removeStatus(defv1)
+			data, err = removeFields(defv1)
 			if err != nil {
 				return nil, "", err
 			}
@@ -299,7 +299,7 @@ func WriteCRD(dir string, gk schema.GroupKind, version string, noDesc bool) ([]b
 				return nil, "", err
 			}
 
-			data, err = removeStatus(defv1beta1)
+			data, err = removeFields(defv1beta1)
 			if err != nil {
 				return nil, "", err
 			}
@@ -323,7 +323,7 @@ func WriteCRD(dir string, gk schema.GroupKind, version string, noDesc bool) ([]b
 		removeCRDDesc(defv1)
 	}
 
-	data, err = removeStatus(defv1)
+	data, err = removeFields(defv1)
 	if err != nil {
 		return nil, "", err
 	}
@@ -393,7 +393,7 @@ func removeDescription(schema *crdv1.JSONSchemaProps) {
 	}
 }
 
-func removeStatus(crd any) ([]byte, error) {
+func removeFields(crd any) ([]byte, error) {
 	jsonBytes, err := json.Marshal(crd)
 	if err != nil {
 		return nil, err
@@ -405,6 +405,7 @@ func removeStatus(crd any) ([]byte, error) {
 		return nil, err
 	}
 
+	unstructured.RemoveNestedField(content, "metadata", "creationTimestamp")
 	unstructured.RemoveNestedField(content, "status")
 
 	return yaml.Marshal(content)
