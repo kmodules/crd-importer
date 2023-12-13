@@ -6,7 +6,7 @@ require (
 	github.com/spf13/pflag v1.0.5
 	k8s.io/apiextensions-apiserver v0.25.1
 	k8s.io/apimachinery v0.25.3
-	kmodules.xyz/client-go v0.25.40
+	kmodules.xyz/client-go v0.25.43
 	sigs.k8s.io/yaml v1.3.0
 )
 
