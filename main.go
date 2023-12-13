@@ -195,7 +195,7 @@ func processLocation(location string) error {
 }
 
 func extractCRD(ri parser.ResourceInfo) error {
-	if ri.Object.GetKind() == "" {
+	if ri.Object.GetKind() != "CustomResourceDefinition" {
 		return nil
 	}
 
@@ -215,7 +215,6 @@ func extractCRD(ri parser.ResourceInfo) error {
 		Group: def.Spec.Group,
 		Kind:  def.Spec.Names.Kind,
 	}
-
 	if _, ok := crdstore[gk]; !ok {
 		crdstore[gk] = map[string]*unstructured.Unstructured{}
 	}
