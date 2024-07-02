@@ -35,6 +35,7 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	crdv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	crdv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -73,6 +74,8 @@ func main() {
 	var gks []string
 	var groups []string
 	var noDesc bool
+	var strLabels string
+	var strAnnotations string
 
 	flag.StringSliceVar(&input, "input", input, "List of crd urls or dir/files")
 	flag.StringVar(&out, "out", out, "Directory where files to be stored")
@@ -81,6 +84,8 @@ func main() {
 	flag.StringSliceVarP(&groups, "group", "g", groups, "List of groups to import")
 	flag.StringSliceVar(&gks, "gk", gks, "List of kind.group to import")
 	flag.BoolVar(&noDesc, "no-description", noDesc, "If true, remove description")
+	flag.StringVar(&strLabels, "labels", strLabels, "Label to apply to crd")
+	flag.StringVar(&strAnnotations, "annotations", strAnnotations, "Annotations to apply to crd")
 	flag.CommandLine.AddGoFlagSet(goflag.CommandLine)
 	flag.Parse()
 
@@ -102,10 +107,20 @@ func main() {
 		}
 	}
 
+	labels, err := parseToMap(strLabels)
+	if err != nil {
+		panic(err)
+	}
+
+	annotations, err := parseToMap(strAnnotations)
+	if err != nil {
+		panic(err)
+	}
+
 	outputCRDs := make([]CRD, 0, len(crdstore))
 	for gk := range crdstore {
 		if allowed(gk) {
-			data, filename, err := WriteCRD(out, gk, crdVersion, noDesc)
+			data, filename, err := WriteCRD(out, gk, crdVersion, noDesc, labels, annotations)
 			if err != nil {
 				panic(err)
 			}
@@ -223,7 +238,7 @@ func extractCRD(ri parser.ResourceInfo) error {
 	return nil
 }
 
-func WriteCRD(dir string, gk schema.GroupKind, version string, noDesc bool) ([]byte, string, error) {
+func WriteCRD(dir string, gk schema.GroupKind, version string, noDesc bool, labels, annotations map[string]string) ([]byte, string, error) {
 	crdversions, ok := crdstore[gk]
 	if !ok {
 		return nil, "", fmt.Errorf("missing crd for %+v", gk)
@@ -259,8 +274,9 @@ func WriteCRD(dir string, gk schema.GroupKind, version string, noDesc bool) ([]b
 			}
 
 			if noDesc {
-				removeCRDDesc(defv1)
+				removeCRDDesc(&defv1)
 			}
+			applyLabelsAnnotations(&defv1, labels, annotations)
 
 			data, err = removeFields(defv1)
 			if err != nil {
@@ -283,8 +299,9 @@ func WriteCRD(dir string, gk schema.GroupKind, version string, noDesc bool) ([]b
 			}
 
 			if noDesc {
-				removeCRDDesc(defv1)
+				removeCRDDesc(&defv1)
 			}
+			applyLabelsAnnotations(&defv1, labels, annotations)
 
 			var inner apiextensions.CustomResourceDefinition
 			err = crdv1.Convert_v1_CustomResourceDefinition_To_apiextensions_CustomResourceDefinition(&defv1, &inner, nil)
@@ -319,8 +336,9 @@ func WriteCRD(dir string, gk schema.GroupKind, version string, noDesc bool) ([]b
 	}
 
 	if noDesc {
-		removeCRDDesc(defv1)
+		removeCRDDesc(&defv1)
 	}
+	applyLabelsAnnotations(&defv1, labels, annotations)
 
 	data, err = removeFields(defv1)
 	if err != nil {
@@ -331,7 +349,23 @@ func WriteCRD(dir string, gk schema.GroupKind, version string, noDesc bool) ([]b
 	return data, filename, nil
 }
 
-func removeCRDDesc(defv1 crdv1.CustomResourceDefinition) {
+func applyLabelsAnnotations(defv1 *crdv1.CustomResourceDefinition, labels map[string]string, annotations map[string]string) {
+	if len(labels) > 0 && defv1.Labels == nil {
+		defv1.Labels = map[string]string{}
+	}
+	for k, v := range labels {
+		defv1.Labels[k] = v
+	}
+
+	if len(annotations) > 0 && defv1.Annotations == nil {
+		defv1.Annotations = map[string]string{}
+	}
+	for k, v := range annotations {
+		defv1.Annotations[k] = v
+	}
+}
+
+func removeCRDDesc(defv1 *crdv1.CustomResourceDefinition) {
 	for idx, v := range defv1.Spec.Versions {
 		if v.Schema != nil && v.Schema.OpenAPIV3Schema != nil {
 			removeDescription(v.Schema.OpenAPIV3Schema)
@@ -408,4 +442,12 @@ func removeFields(crd any) ([]byte, error) {
 	unstructured.RemoveNestedField(content, "status")
 
 	return yaml.Marshal(content)
+}
+
+func parseToMap(str string) (map[string]string, error) {
+	sel, err := metav1.ParseToLabelSelector(str)
+	if err != nil {
+		return nil, err
+	}
+	return metav1.LabelSelectorAsMap(sel)
 }
