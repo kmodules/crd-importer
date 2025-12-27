@@ -249,7 +249,8 @@ func WriteCRD(dir string, gk schema.GroupKind, version string, noDesc bool, labe
 
 	crd, ok := crdversions[version]
 	if !ok {
-		if version == "v1" {
+		switch version {
+		case "v1":
 			// convert to v1
 			data, err := yaml.Marshal(crdversions["v1beta1"])
 			if err != nil {
@@ -286,7 +287,7 @@ func WriteCRD(dir string, gk schema.GroupKind, version string, noDesc bool, labe
 			filename := filepath.Join(dir, fmt.Sprintf("%s_%s.yaml", defv1.Spec.Group, defv1.Spec.Names.Plural))
 			return data, filename, nil
 			// return os.WriteFile(filename, data, 0644)
-		} else if version == "v1beta1" {
+		case "v1beta1":
 			// convert to v1beta1
 			data, err := yaml.Marshal(crdversions["v1"])
 			if err != nil {
